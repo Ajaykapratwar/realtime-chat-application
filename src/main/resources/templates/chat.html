@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Modern Real-Time Chat</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.1/stomp.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(-45deg, #667eea, #764ba2, #6a11cb, #2575fc);
+            background-size: 400% 400%;
+            animation: gradientBG 10s ease infinite;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .chat-container {
+            width: 420px;
+            height: 650px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            border-radius: 25px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            padding: 20px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .online-status {
+            font-size: 12px;
+            color: #00ff88;
+            margin-top: 5px;
+        }
+
+        #chat {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .message {
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 75%;
+            font-size: 14px;
+            animation: pop 0.3s ease;
+        }
+
+        @keyframes pop {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .sent {
+            align-self: flex-end;
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+            color: white;
+            border-bottom-right-radius: 5px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .received {
+            align-self: flex-start;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            border-bottom-left-radius: 5px;
+        }
+
+        .sender-name {
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            opacity: 0.7;
+        }
+
+        .input-section {
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255,255,255,0.2);
+        }
+
+        input {
+            width: 100%;
+            padding: 10px 15px;
+            border-radius: 20px;
+            border: none;
+            outline: none;
+            margin-bottom: 10px;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: none;
+            cursor: pointer;
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+            color: white;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">
+        💬 Real-Time Chat
+        <div class="online-status">● Connected</div>
+    </div>
+
+    <div id="chat"></div>
+
+    <div class="input-section">
+        <input id="senderInput" type="text" placeholder="Your name..." />
+        <div class="input-row">
+            <input id="messageInput" type="text" placeholder="Type a message..." />
+            <button id="sendMessage">Send</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    var stompClient = null;
+
+    function connect() {
+        var socket = new SockJS('/chat');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function () {
+            stompClient.subscribe('/topic/messages', function (message) {
+                showMessage(JSON.parse(message.body));
+            });
+        });
+    }
+
+    function showMessage(message) {
+        var chat = document.getElementById('chat');
+        var msgDiv = document.createElement('div');
+        var currentUser = document.getElementById('senderInput').value;
+
+        msgDiv.classList.add('message');
+        msgDiv.classList.add(message.sender === currentUser ? 'sent' : 'received');
+
+        msgDiv.innerHTML =
+            '<div class="sender-name">' + message.sender + '</div>' +
+            message.content;
+
+        chat.appendChild(msgDiv);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    function sendMessage() {
+        var sender = document.getElementById('senderInput').value;
+        var content = document.getElementById('messageInput').value;
+
+        if (!sender || !content) return;
+
+        stompClient.send("/app/sendMessages", {}, JSON.stringify({
+            sender: sender,
+            content: content
+        }));
+
+        document.getElementById('messageInput').value = '';
+    }
+
+    document.getElementById('sendMessage').onclick = sendMessage;
+
+    document.getElementById('messageInput')
+        .addEventListener("keypress", function(e) {
+            if (e.key === "Enter") sendMessage();
+        });
+
+    window.addEventListener("load", connect);
+</script>
+
+</body>
+</html>
