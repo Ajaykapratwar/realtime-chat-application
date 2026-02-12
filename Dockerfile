@@ -1,14 +1,29 @@
-# Use lightweight Java image
-FROM eclipse-temurin:21-jdk-alpine
+# -------- Stage 1: Build the application --------
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
 
-# Set working directory
 WORKDIR /app
 
-# Copy jar file
-COPY target/app-0.0.1-SNAPSHOT.jar app.jar
+# Copy pom.xml first (better caching)
+COPY pom.xml .
 
-# Expose port
+# Download dependencies
+RUN mvn dependency:go-offline
+
+# Copy source code
+COPY src ./src
+
+# Build the jar
+RUN mvn clean package -DskipTests
+
+
+# -------- Stage 2: Run the application --------
+FROM eclipse-temurin:21-jdk-alpine
+
+WORKDIR /app
+
+# Copy jar from build stage
+COPY --from=build /app/target/*.jar app.jar
+
 EXPOSE 8080
 
-# Run the app
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java","-jar","app.jar"]
